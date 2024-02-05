@@ -104,6 +104,8 @@ private:
     std::vector<llama_token> cml_sfx;
     std::vector<llama_token> embd_inp;
     std::vector<llama_token> guidance_inp;
+    std::vector<llama_token> embd;
+    std::vector<llama_token> embd_guidance;
     std::vector<llama_token> embd_list;
 };
 
