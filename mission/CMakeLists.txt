@@ -1,5 +1,5 @@
 # Mission
-#set(CMAKE_CXX_FLAGS "-g") # for debug
+set(CMAKE_CXX_FLAGS "-g") # 在debug时使用，在完成debug后应当注释掉。
 
 find_package(jsoncpp REQUIRED)
 add_library(mission STATIC mission.cpp)
@@ -10,4 +10,5 @@ target_include_directories(mission PUBLIC .)
 add_executable(pipeline pipeline.cpp)
 #add_library(pipeline STATIC pipeline.cpp)
 target_link_libraries(pipeline PRIVATE mission common)
+#target_compile_features(pipeline PRIVATE cxx_std_17)
 
