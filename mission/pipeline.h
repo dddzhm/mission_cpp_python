@@ -41,12 +41,20 @@
 #if defined(_MSC_VER)
 #pragma warning(disable: 4244 4267) // possible loss of data
 #endif
+void write_logfile(
+        const llama_context * ctx, const gpt_params & params, const llama_model * model,
+        const std::vector<llama_token> & input_tokens, const std::string & output,
+        const std::vector<llama_token> & output_tokens
+);
 
 class Pipeline{
 public:
     Pipeline()=delete;
     explicit Pipeline(const gpt_params &params);
     ~Pipeline();
+
+    std::string generator(const std::string& prompts);
+    void tokenize(std::basic_string<char> prompts);
 
     bool is_interacting = false;
 
@@ -77,6 +85,9 @@ private:
     int n_consumed          = 0;
     int n_session_consumed  = 0;
     int n_past_guidance     = 0;
+    int ga_i                = 0;
+    int ga_n;
+    int ga_w;
 
     bool add_bos;
     bool is_antiprompt        = false;
@@ -93,6 +104,7 @@ private:
     std::vector<llama_token> cml_sfx;
     std::vector<llama_token> embd_inp;
     std::vector<llama_token> guidance_inp;
+    std::vector<llama_token> embd_list;
 };
 
 #endif //PIPLINE_H

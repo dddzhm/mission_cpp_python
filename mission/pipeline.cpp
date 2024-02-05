@@ -299,16 +299,13 @@ Pipeline::Pipeline(const gpt_params &p): params(p), sparams(p.sparams), path_ses
 
     // group-attention state
     // number of grouped KV tokens so far (used only if params.grp_attn_n > 1)
-    int ga_i = 0;
 
-    const int ga_n = params.grp_attn_n;
-    const int ga_w = params.grp_attn_w;
+    ga_n = params.grp_attn_n;
+    ga_w = params.grp_attn_w;
 
     if (ga_n != 1) {
         GGML_ASSERT(ga_n > 0                    && "grp_attn_n must be positive");                     // NOLINT
         GGML_ASSERT(ga_w % ga_n == 0            && "grp_attn_w must be a multiple of grp_attn_n");     // NOLINT
-        //GGML_ASSERT(n_ctx_train % ga_w == 0     && "n_ctx_train must be a multiple of grp_attn_w");    // NOLINT
-        //GGML_ASSERT(n_ctx >= n_ctx_train * ga_n && "n_ctx must be at least n_ctx_train * grp_attn_n"); // NOLINT
         LOG_TEE("self-extend: n_ctx_train = %d, grp_attn_n = %d, grp_attn_w = %d\n", n_ctx_train, ga_n, ga_w);
     }
     LOG_TEE("\n\n");
@@ -333,16 +330,22 @@ Pipeline::Pipeline(const gpt_params &p): params(p), sparams(p.sparams), path_ses
     }
 
     need_to_save_session = !path_session.empty() && n_matching_session_tokens < embd_inp.size();
-    n_remain = params.n_predict;
+    n_remain             = params.n_predict;
+    ctx_sampling         = llama_sampling_init(sparams);
+
+    std::cout << generator("") << "\n";
 }
 
 Pipeline::~Pipeline() {
+    llama_print_timings(ctx);
+    write_logfile(ctx, params, model, input_tokens, output_ss.str(), output_tokens);
+
     if (ctx_guidance) { llama_free(ctx_guidance); }
 
     llama_free(ctx);
     llama_free_model(model);
 
-//    llama_sampling_free(ctx_sampling);
+    llama_sampling_free(ctx_sampling);
     llama_backend_free();
 }
 
@@ -354,6 +357,94 @@ void Pipeline::llama_log_callback_logTee(ggml_log_level level, const char *text,
 
 gpt_params Pipeline::get_params() {
     return params;
+}
+
+std::string Pipeline::generator(const std::string& prompts) {
+    // TODO: add "console" settings and delete all "printf"
+    if (!prompts.empty()){
+        tokenize(prompts);
+    }
+    return "";
+}
+
+void Pipeline::tokenize(std::basic_string<char> prompts) {
+    if (n_past > 0 && is_interacting) {
+        // TODO: add "console" settings and delete all "printf"
+        if (params.instruct || params.chatml) {
+            printf("\n> ");
+        }
+
+        if (params.input_prefix_bos) {
+            LOG("adding input prefix BOS token\n");
+            embd_inp.push_back(llama_token_bos(model));
+        }
+
+        if (!params.input_prefix.empty()) {
+            LOG("appending input prefix: '%s'\n", params.input_prefix.c_str());
+            printf("%s", params.input_prefix.c_str());
+        }
+
+        if (prompts.length() > 1) {
+            // append input suffix if any
+            if (!params.input_suffix.empty()) {
+                LOG("appending input suffix: '%s'\n", params.input_suffix.c_str());
+                printf("%s", params.input_suffix.c_str());
+            }
+
+            LOG("buffer: '%s'\n", prompts.c_str());
+
+            const size_t original_size = embd_inp.size();
+
+            // instruct mode: insert instruction prefix
+            if (params.instruct && !is_antiprompt) {
+                LOG("inserting instruction prefix\n");
+                n_consumed = (int)embd_inp.size();
+                embd_inp.insert(embd_inp.end(), inp_pfx.begin(), inp_pfx.end());
+            }
+            // chatml mode: insert user chat prefix
+            if (params.chatml && !is_antiprompt) {
+                LOG("inserting chatml prefix\n");
+                n_consumed = (int)embd_inp.size();
+                embd_inp.insert(embd_inp.end(), cml_pfx.begin(), cml_pfx.end());
+            }
+            if (params.escape) {
+                process_escapes(prompts);
+            }
+
+            const auto line_pfx = ::llama_tokenize(ctx, params.input_prefix, false, true);
+            const auto line_inp = ::llama_tokenize(ctx, prompts,              false, false);
+            const auto line_sfx = ::llama_tokenize(ctx, params.input_suffix, false, true);
+            LOG("input tokens: %s\n", LOG_TOKENS_TOSTR_PRETTY(ctx, line_inp).c_str());
+
+            embd_inp.insert(embd_inp.end(), line_pfx.begin(), line_pfx.end());
+            embd_inp.insert(embd_inp.end(), line_inp.begin(), line_inp.end());
+            embd_inp.insert(embd_inp.end(), line_sfx.begin(), line_sfx.end());
+
+            // instruct mode: insert response suffix
+            if (params.instruct) {
+                LOG("inserting instruction suffix\n");
+                embd_inp.insert(embd_inp.end(), inp_sfx.begin(), inp_sfx.end());
+            }
+            // chatml mode: insert assistant chat suffix
+            if (params.chatml) {
+                LOG("inserting chatml suffix\n");
+                embd_inp.insert(embd_inp.end(), cml_sfx.begin(), cml_sfx.end());
+            }
+
+            for (size_t i = original_size; i < embd_inp.size(); ++i) {
+                const llama_token token = embd_inp[i];
+                output_tokens.push_back(token);
+                output_ss << llama_token_to_piece(ctx, token);
+            }
+
+            n_remain -= (int)line_inp.size();
+            LOG("n_remain: %d\n", n_remain);
+        } else {
+            LOG("empty line, passing control back\n");
+        }
+
+        input_echo = false; // do not echo this again
+    }
 }
 
 llama_context           ** g_ctx;
@@ -442,6 +533,7 @@ int main(int argc, char ** argv){
     }
 
     Pipeline test(params);
+    test.generator("test");
     is_interacting = test.is_interacting;
 
 #if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__))
