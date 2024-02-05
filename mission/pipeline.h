@@ -48,27 +48,47 @@ public:
     explicit Pipeline(const gpt_params &params);
     ~Pipeline();
 
+    bool is_interacting = false;
+
+    std::ostringstream output_ss;
+    std::vector<llama_token> input_tokens;
+    std::vector<llama_token> output_tokens;
+
     llama_model* model = nullptr;
     llama_context* ctx = nullptr;
     llama_context* ctx_guidance = nullptr;
+    llama_sampling_context * ctx_sampling = nullptr;
     std::unique_ptr<mission::MissionTokenizer> tokenizer = nullptr;
+
+    gpt_params get_params();
+
 private:
     static void llama_log_callback_logTee(ggml_log_level level, const char * text, void * user_data);
 
     gpt_params params;
     const llama_sampling_params &sparams;
 
-    int n_ctx_train;
-    int n_ctx;
-    int guidance_offset = 0;
+    int n_ctx_train         = 0;
+    int n_ctx               = 0;
+    int guidance_offset     = 0;
     int original_prompt_len = 0;
-    bool add_bos;
+    int n_past              = 0;
+    int n_remain            = 0;
+    int n_consumed          = 0;
+    int n_session_consumed  = 0;
+    int n_past_guidance     = 0;
 
-    std::string path_session;
+    bool add_bos;
+    bool is_antiprompt        = false;
+    bool input_echo           = true;
+    bool display              = true;
+    bool need_to_save_session = false;
+
+    std::string        path_session;
+
     std::vector<llama_token> session_tokens;
     std::vector<llama_token> inp_pfx;
     std::vector<llama_token> inp_sfx;
-
     std::vector<llama_token> cml_pfx;
     std::vector<llama_token> cml_sfx;
     std::vector<llama_token> embd_inp;

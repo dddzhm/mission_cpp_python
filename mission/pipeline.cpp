@@ -297,6 +297,43 @@ Pipeline::Pipeline(const gpt_params &p): params(p), sparams(p.sparams), path_ses
     LOG_TEE("sampling order: \n%s\n", llama_sampling_order_print(sparams).c_str());
     LOG_TEE("generate: n_ctx = %d, n_batch = %d, n_predict = %d, n_keep = %d\n", n_ctx, params.n_batch, params.n_predict, params.n_keep);
 
+    // group-attention state
+    // number of grouped KV tokens so far (used only if params.grp_attn_n > 1)
+    int ga_i = 0;
+
+    const int ga_n = params.grp_attn_n;
+    const int ga_w = params.grp_attn_w;
+
+    if (ga_n != 1) {
+        GGML_ASSERT(ga_n > 0                    && "grp_attn_n must be positive");                     // NOLINT
+        GGML_ASSERT(ga_w % ga_n == 0            && "grp_attn_w must be a multiple of grp_attn_n");     // NOLINT
+        //GGML_ASSERT(n_ctx_train % ga_w == 0     && "n_ctx_train must be a multiple of grp_attn_w");    // NOLINT
+        //GGML_ASSERT(n_ctx >= n_ctx_train * ga_n && "n_ctx must be at least n_ctx_train * grp_attn_n"); // NOLINT
+        LOG_TEE("self-extend: n_ctx_train = %d, grp_attn_n = %d, grp_attn_w = %d\n", n_ctx_train, ga_n, ga_w);
+    }
+    LOG_TEE("\n\n");
+
+    if (params.interactive) {
+        const char *control_message;
+        if (params.multiline_input) {
+            control_message = " - To return control to LLaMa, end your input with '\\'.\n"
+                              " - To return control without starting a new line, end your input with '/'.\n";
+        } else {
+            control_message = " - Press Return to return control to LLaMa.\n"
+                              " - To return control without starting a new line, end your input with '/'.\n"
+                              " - If you want to submit another line, end your input with '\\'.\n";
+        }
+        LOG_TEE("== Running in interactive mode. ==\n");
+#if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__)) || defined (_WIN32)
+        LOG_TEE(       " - Press Ctrl+C to interject at any time.\n");
+#endif
+        LOG_TEE(       "%s\n", control_message);
+
+        is_interacting = params.interactive_first;
+    }
+
+    need_to_save_session = !path_session.empty() && n_matching_session_tokens < embd_inp.size();
+    n_remain = params.n_predict;
 }
 
 Pipeline::~Pipeline() {
@@ -313,6 +350,10 @@ void Pipeline::llama_log_callback_logTee(ggml_log_level level, const char *text,
     (void) level;
     (void) user_data;
     LOG_TEE("%s", text);
+}
+
+gpt_params Pipeline::get_params() {
+    return params;
 }
 
 llama_context           ** g_ctx;
@@ -400,6 +441,9 @@ int main(int argc, char ** argv){
         return 0;
     }
 
+    Pipeline test(params);
+    is_interacting = test.is_interacting;
+
 #if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__))
     struct sigaction sigint_action{};
     sigint_action.sa_handler = sigint_handler;
@@ -412,7 +456,6 @@ int main(int argc, char ** argv){
         };
         SetConsoleCtrlHandler(reinterpret_cast<PHANDLER_ROUTINE>(console_ctrl_handler), true);
 #endif
-    Pipeline test(params);
     std::string line;
     while(true){
         if(!std::getline(std::cin, line)) {
