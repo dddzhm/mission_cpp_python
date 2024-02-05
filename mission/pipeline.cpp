@@ -6,7 +6,7 @@ Pipeline::Pipeline(const gpt_params &p): params(p), sparams(p.sparams), path_ses
         tokenizer = mission::build_tokenizer(params.tiktoken_config, params.tiktoken_path);
     }
 #ifndef LOG_DISABLE_LOGS
-    log_set_target(log_filename_generator("main", "log"));
+    log_set_target(log_filename_generator("pipeline", "log"));
     LOG_TEE("Log start\n");
     llama_log_set(llama_log_callback_logTee, nullptr);
 #endif // LOG_DISABLE_LOGS
@@ -174,8 +174,13 @@ Pipeline::Pipeline(const gpt_params &p): params(p), sparams(p.sparams), path_ses
         params.n_keep = (int)embd_inp.size();
     }
 
-    inp_pfx = ::llama_tokenize(ctx, "\n\n### Instruction:\n\n", add_bos, true);
-    inp_sfx = ::llama_tokenize(ctx, "\n\n### Response:\n\n", false, true);
+    if (tokenizer != nullptr) {
+        inp_pfx = tokenizer->encode("\n\n### Instruction:\n\n", params.n_ctx);
+        inp_sfx = tokenizer->encode("\n\n### Response:\n\n", params.n_ctx);
+    }else{
+        inp_pfx = ::llama_tokenize(ctx, "\n\n### Instruction:\n\n", add_bos, true);
+        inp_sfx = ::llama_tokenize(ctx, "\n\n### Response:\n\n", false, true);
+    }
 
     LOG("inp_pfx: %s\n", LOG_TOKENS_TOSTR_PRETTY(ctx, inp_pfx).c_str());
     LOG("inp_sfx: %s\n", LOG_TOKENS_TOSTR_PRETTY(ctx, inp_sfx).c_str());
@@ -234,6 +239,64 @@ Pipeline::Pipeline(const gpt_params &p): params(p), sparams(p.sparams), path_ses
         }
         LOG_TEE("\n");
     }
+    if (params.interactive) {
+        LOG_TEE("%s: interactive mode on.\n", __func__);
+
+        if (!params.antiprompt.empty()) {
+            for (const auto & antiprompt : params.antiprompt) {
+                LOG_TEE("Reverse prompt: '%s'\n", antiprompt.c_str());
+                if (params.verbose_prompt) {
+                    std::vector<int> tmp;
+                    if (tokenizer != nullptr) {
+                        tmp = tokenizer->encode(antiprompt, params.n_ctx);
+                    }else{
+                        tmp = ::llama_tokenize(ctx, antiprompt, false, true);
+                    }
+                    for (int i : tmp) {
+                        LOG_TEE("%6d -> '%s'\n", i, llama_token_to_piece(ctx, i).c_str());
+                    }
+                }
+            }
+        }
+
+        if (params.input_prefix_bos) {
+            LOG_TEE("Input prefix with BOS\n");
+        }
+
+        if (!params.input_prefix.empty()) {
+            LOG_TEE("Input prefix: '%s'\n", params.input_prefix.c_str());
+            if (params.verbose_prompt) {
+                std::vector<int> tmp;
+                if (tokenizer != nullptr) {
+                    tmp = tokenizer->encode(params.input_prefix, params.n_ctx);
+                }else{
+                    tmp = ::llama_tokenize(ctx, params.input_prefix, true, true);
+                }
+                for (int i : tmp) {
+                    LOG_TEE("%6d -> '%s'\n", i, llama_token_to_piece(ctx, i).c_str());
+                }
+            }
+        }
+
+        if (!params.input_suffix.empty()) {
+            LOG_TEE("Input suffix: '%s'\n", params.input_suffix.c_str());
+            if (params.verbose_prompt) {
+                std::vector<int> tmp;
+                if (tokenizer != nullptr) {
+                    tmp = tokenizer->encode(params.input_suffix, params.n_ctx);
+                }else{
+                    tmp = ::llama_tokenize(ctx, params.input_suffix, false, true);
+                }
+                for (int i : tmp) {
+                    LOG_TEE("%6d -> '%s'\n", i, llama_token_to_piece(ctx, i).c_str());
+                }
+            }
+        }
+    }
+    LOG_TEE("sampling: \n%s\n", llama_sampling_print(sparams).c_str());
+    LOG_TEE("sampling order: \n%s\n", llama_sampling_order_print(sparams).c_str());
+    LOG_TEE("generate: n_ctx = %d, n_batch = %d, n_predict = %d, n_keep = %d\n", n_ctx, params.n_batch, params.n_predict, params.n_keep);
+
 }
 
 Pipeline::~Pipeline() {
@@ -252,11 +315,78 @@ void Pipeline::llama_log_callback_logTee(ggml_log_level level, const char *text,
     LOG_TEE("%s", text);
 }
 
+llama_context           ** g_ctx;
+llama_model             ** g_model;
+gpt_params               * g_params;
+std::vector<llama_token> * g_input_tokens;
+std::ostringstream       * g_output_ss;
+std::vector<llama_token> * g_output_tokens;
+bool is_interacting = false;
+
+void write_logfile(
+        const llama_context * ctx, const gpt_params & params, const llama_model * model,
+        const std::vector<llama_token> & input_tokens, const std::string & output,
+        const std::vector<llama_token> & output_tokens
+) {
+    if (params.logdir.empty()) {
+        return;
+    }
+
+    const std::string timestamp = get_sortable_timestamp();
+
+    const bool success = create_directory_with_parents(params.logdir);
+    if (!success) {
+        fprintf(stderr, "%s: warning: failed to create logdir %s, cannot write logfile\n",
+                __func__, params.logdir.c_str());
+        return;
+    }
+
+    const std::string logfile_path = params.logdir + timestamp + ".yml";
+    FILE * logfile = fopen(logfile_path.c_str(), "w");
+
+    if (logfile == nullptr) {
+        fprintf(stderr, "%s: failed to open logfile %s\n", __func__, logfile_path.c_str());
+        return;
+    }
+
+    fprintf(logfile, "binary: main\n");
+    char model_desc[128];
+    llama_model_desc(model, model_desc, sizeof(model_desc));
+    dump_non_result_info_yaml(logfile, params, ctx, timestamp, input_tokens, model_desc);
+
+    fprintf(logfile, "\n");
+    fprintf(logfile, "######################\n");
+    fprintf(logfile, "# Generation Results #\n");
+    fprintf(logfile, "######################\n");
+    fprintf(logfile, "\n");
+
+    dump_string_yaml_multiline(logfile, "output", output.c_str());
+    dump_vector_int_yaml(logfile, "output_tokens", output_tokens);
+
+    llama_dump_timing_info_yaml(logfile, ctx);
+    fclose(logfile);
+}
+
+#if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__)) || defined (_WIN32)
+void sigint_handler(int signo) {
+    if (signo == SIGINT) {
+        std::cout<<"------------------------\n";
+        if (!is_interacting) {
+            is_interacting = true;
+        } else {
+            console::cleanup();
+            printf("\n");
+            llama_print_timings(*g_ctx);
+            write_logfile(*g_ctx, *g_params, *g_model, *g_input_tokens, g_output_ss->str(), *g_output_tokens);
+            _exit(130);
+        }
+    }
+}
+#endif
+
 int main(int argc, char ** argv){
     gpt_params params;
-    if (!gpt_params_parse(argc, argv, params)){
-        return 0;
-    }
+
     //todo: delete
     params.model = "../../1_8B_tuned/q4_0.gguf";
     params.tiktoken_config = "../../1_8B_tuned/tiktoken_config.json";
@@ -266,6 +396,30 @@ int main(int argc, char ** argv){
     params.interactive=true;
     //
 
+    if (!gpt_params_parse(argc, argv, params)){
+        return 0;
+    }
+
+#if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__))
+    struct sigaction sigint_action{};
+    sigint_action.sa_handler = sigint_handler;
+    sigemptyset (&sigint_action.sa_mask);
+    sigint_action.sa_flags = 0;
+    sigaction(SIGINT, &sigint_action, nullptr);
+#elif defined (_WIN32)
+    auto console_ctrl_handler = +[](DWORD ctrl_type) -> BOOL {
+            return (ctrl_type == CTRL_C_EVENT) ? (sigint_handler(SIGINT), true) : false;
+        };
+        SetConsoleCtrlHandler(reinterpret_cast<PHANDLER_ROUTINE>(console_ctrl_handler), true);
+#endif
     Pipeline test(params);
+    std::string line;
+    while(true){
+        if(!std::getline(std::cin, line)) {
+            line.clear();
+            break;
+        }
+        std::cout<<line<<"\n";
+    }
     return 0;
 }
