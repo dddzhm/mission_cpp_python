@@ -116,6 +116,12 @@ int main(int argc, char ** argv) {
     if (!gpt_params_parse(argc, argv, params)) {
         return 1;
     }
+    params.model = "../../1_8B_tuned/q4_0.gguf";
+    params.tiktoken_config = "../../1_8B_tuned/tiktoken_config.json";
+    params.tiktoken_path= "../../1_8B_tuned/qwen.tiktoken";
+    params.prompt = "You are a helpful assistant.";
+    params.chatml = true;
+    params.interactive=true;
     llama_sampling_params & sparams = params.sparams;
 
     std::unique_ptr<mission::MissionTokenizer> tokenizer = nullptr;
