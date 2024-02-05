@@ -1,5 +1,5 @@
-#include "mission/tiktoken.h"
-#include "mission/mission.h"
+#include "tiktoken.h"
+#include "mission.h"
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
