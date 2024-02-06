@@ -347,6 +347,10 @@ Pipeline::~Pipeline() {
 
     llama_sampling_free(ctx_sampling);
     llama_backend_free();
+
+#ifndef LOG_DISABLE_LOGS
+    LOG_TEE("Log end\n");
+#endif // LOG_DISABLE_LOGS
 }
 
 void Pipeline::llama_log_callback_logTee(ggml_log_level level, const char *text, void *user_data) {
@@ -582,7 +586,6 @@ std::string Pipeline::generator(const bool& init_flag, const std::string& prompt
             }
             // reset color to default if there is no pending user input
             if (input_echo && (int) embd_inp.size() == n_consumed) {
-//                console::set_display(console::reset);
                 display = true;
             }
         }
@@ -643,7 +646,6 @@ std::string Pipeline::generator(const bool& init_flag, const std::string& prompt
                         }else{
                             first_antiprompt = ::llama_tokenize(ctx, params.antiprompt.front(), false, true);
                         }
-                        // const auto first_antiprompt = ::llama_tokenize(ctx, params.antiprompt.front(), false, true);
                         embd_inp.insert(embd_inp.end(), first_antiprompt.begin(), first_antiprompt.end());
                         is_antiprompt = true;
                     }
@@ -849,8 +851,16 @@ int main(int argc, char ** argv){
     }
 
     Pipeline test(params);
-    test.generator(false, "instruction：识别目标和指令（指令包括:search、get、go_to、go_back、rotate、turn_left、turn_right、get_in、go_forward、wait、put、stop）。\\n任务:逆时针旋转负二十度。");
+    std::cout<<test.generator(false, "instruction：识别目标和指令（指令包括:search、get、go_to、go_back、rotate、turn_left、turn_right、get_in、go_forward、wait、put、stop）。\\n任务:逆时针旋转负二十度。");
     is_interacting = test.is_interacting;
+
+    gpt_params w_params = test.get_params();
+    g_ctx = &test.ctx;
+    g_model = &test.model;
+    g_params = &w_params;
+    g_input_tokens = &test.input_tokens;
+    g_output_ss = &test.output_ss;
+    g_output_tokens = &test.output_tokens;
 
 #if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__))
     struct sigaction sigint_action{};
