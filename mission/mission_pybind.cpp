@@ -45,7 +45,9 @@ PYBIND11_MODULE(_C, m) {
     .def("generator", &Pipeline::generator)
     .def("tokenize", &Pipeline::tokenize);
 
+  py::class_<gpt_params>(m, "gpt_params");
   m.def("build_tokenizer", &build_tokenizer);
+  m.def("mission_params_parse", &mission_params_parse);
 
 }
 

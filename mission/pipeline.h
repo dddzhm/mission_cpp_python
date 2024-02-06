@@ -47,6 +47,10 @@ void write_logfile(
         const std::vector<llama_token> & output_tokens
 );
 
+gpt_params mission_params_parse(const int& argc, const std::vector<std::string>& argv);
+bool mission_params_parse_ex(const int& argc, const std::vector<std::string>& argv, gpt_params & params);
+void mission_print_usage(int /*argc*/, const std::vector<std::string>& argv, const gpt_params & params);
+
 class Pipeline{
 public:
     Pipeline()=delete;
