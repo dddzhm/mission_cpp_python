@@ -803,7 +803,7 @@ gpt_params mission_params_parse(const int& argc, const std::vector<std::string>&
             mission_print_usage(argc, argv, gpt_params());
             exit(0);
         }
-        mission_print_usage(argc, argv, params);
+//        mission_print_usage(argc, argv, params);
     }
     catch (const std::invalid_argument & ex) {
         fprintf(stderr, "%s\n", ex.what());
