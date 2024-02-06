@@ -333,7 +333,7 @@ Pipeline::Pipeline(const gpt_params &p): params(p), sparams(p.sparams), path_ses
     n_remain             = params.n_predict;
     ctx_sampling         = llama_sampling_init(sparams);
 
-    std::cout << generator(true) << "\n";
+    generator(true);
 }
 
 Pipeline::~Pipeline() {
@@ -363,11 +363,9 @@ std::string Pipeline::generator(const bool& init_flag, const std::string& prompt
     if (prompts.empty() && !init_flag){
         return "未获得输入......";
     }
-    // TODO: add "console" settings and delete all "printf"
     if (!prompts.empty()){
         tokenize(prompts);
     }
-    // TODO: [add "console" settings] and [delete all "printf"] and [delete some part] and [add break]
     int init_count = 2;
     std::string result;
     while ((n_remain != 0 && !is_antiprompt) || params.interactive) {
@@ -382,10 +380,7 @@ std::string Pipeline::generator(const bool& init_flag, const std::string& prompt
                 const int skipped_tokens = (int) embd.size() - max_embd_size;
                 embd.resize(max_embd_size);
 
-//                console::set_display(console::error);
-                printf("<<input too long: skipped %d token%s>>", skipped_tokens, skipped_tokens != 1 ? "s" : "");
-//                console::set_display(console::reset);
-                fflush(stdout);
+                std::cout << "\033[3;31m<<input too long: skipped " << skipped_tokens << " token" << (skipped_tokens != 1 ? "s" : "") << ">>\033[0m" << "\n";
             }
 
             if (ga_n == 1) {
@@ -584,8 +579,6 @@ std::string Pipeline::generator(const bool& init_flag, const std::string& prompt
             if (input_echo && display) {
                 auto t1 = tokenizer->decode(embd);
                 result += t1;
-                printf("%s", t1.c_str());
-                fflush(stdout);
             }
             // reset color to default if there is no pending user input
             if (input_echo && (int) embd_inp.size() == n_consumed) {
@@ -634,12 +627,9 @@ std::string Pipeline::generator(const bool& init_flag, const std::string& prompt
                     if (input_echo && display) {
                         auto logit_string = tokenizer->decode(embd_list);
                         result = logit_string;
-                        printf("%s", logit_string.c_str());
-                        fflush(stdout);
                     }
                     // reset color to default if there is no pending user input
                     if (input_echo && (int) embd_inp.size() == n_consumed) {
-//                        console::set_display(console::reset);
                         display = true;
                     }
                 }
@@ -691,11 +681,6 @@ std::string Pipeline::generator(const bool& init_flag, const std::string& prompt
 
 void Pipeline::tokenize(std::basic_string<char> prompts) {
     if (n_past > 0 && is_interacting) {
-        // TODO: add "console" settings and delete all "printf"
-        if (params.instruct || params.chatml) {
-            printf("\n> ");
-        }
-
         if (params.input_prefix_bos) {
             LOG("adding input prefix BOS token\n");
             embd_inp.push_back(llama_token_bos(model));
@@ -703,14 +688,12 @@ void Pipeline::tokenize(std::basic_string<char> prompts) {
 
         if (!params.input_prefix.empty()) {
             LOG("appending input prefix: '%s'\n", params.input_prefix.c_str());
-            printf("%s", params.input_prefix.c_str());
         }
 
         if (prompts.length() > 1) {
             // append input suffix if any
             if (!params.input_suffix.empty()) {
                 LOG("appending input suffix: '%s'\n", params.input_suffix.c_str());
-                printf("%s", params.input_suffix.c_str());
             }
 
             LOG("buffer: '%s'\n", prompts.c_str());
@@ -772,9 +755,7 @@ void Pipeline::tokenize(std::basic_string<char> prompts) {
 
 void Pipeline::reset_ctx_sampling() {
     if (n_past > 0) {
-        LOG_TEE("%s\n", "--------------------------------------------");
         if (is_interacting) {
-            LOG_TEE("%s\n", "+++++++++++++++++++++++++++++++++++++++++++++");
             llama_sampling_reset(ctx_sampling);
         }
         is_interacting = false;
@@ -840,7 +821,7 @@ void sigint_handler(int signo) {
         if (!is_interacting) {
             is_interacting = true;
         } else {
-            console::cleanup();
+//            console::cleanup();
             printf("\n");
             llama_print_timings(*g_ctx);
             write_logfile(*g_ctx, *g_params, *g_model, *g_input_tokens, g_output_ss->str(), *g_output_tokens);

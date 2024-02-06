@@ -1,3 +1,4 @@
+#set(CMAKE_CXX_FLAGS "-g") # 在debug时使用，在完成debug后应当注释掉。
 set(TARGET main)
 add_executable(${TARGET} main.cpp)
 install(TARGETS ${TARGET} RUNTIME)
