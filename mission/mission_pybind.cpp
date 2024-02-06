@@ -1,5 +1,6 @@
 #include "tiktoken.h"
 #include "mission.h"
+#include "pipeline.h"
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
@@ -36,6 +37,13 @@ PYBIND11_MODULE(_C, m) {
     .def("encode", &MissionTokenizer::encode)
     .def("decode", &MissionTokenizer::decode)
     .def("encode_history", &MissionTokenizer::encode_history);
+
+  py::class_<Pipeline>(m, "Pipeline")
+    .def(py::init<const gpt_params&>())
+    .def_property_readonly("tokenizer", [](const Pipeline &self){ return self.tokenizer.get(); })
+    .def("write_logfile", &Pipeline::write_logfile)
+    .def("generator", &Pipeline::generator)
+    .def("tokenize", &Pipeline::tokenize);
 
   m.def("build_tokenizer", &build_tokenizer);
 

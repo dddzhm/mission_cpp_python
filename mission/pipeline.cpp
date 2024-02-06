@@ -338,7 +338,7 @@ Pipeline::Pipeline(const gpt_params &p): params(p), sparams(p.sparams), path_ses
 
 Pipeline::~Pipeline() {
     llama_print_timings(ctx);
-    write_logfile(ctx, params, model, input_tokens, output_ss.str(), output_tokens);
+    ::write_logfile(ctx, params, model, input_tokens, output_ss.str(), output_tokens);
 
     if (ctx_guidance) { llama_free(ctx_guidance); }
 
@@ -359,7 +359,7 @@ void Pipeline::llama_log_callback_logTee(ggml_log_level level, const char *text,
     LOG_TEE("%s", text);
 }
 
-gpt_params Pipeline::get_params() {
+gpt_params Pipeline::get_params() const {
     return params;
 }
 
@@ -768,32 +768,36 @@ bool Pipeline::get_is_interacting() const {
     return is_interacting;
 }
 
-llama_model * Pipeline::get_model() {
+llama_model * Pipeline::get_model() const {
     return model;
 }
 
-llama_context *Pipeline::get_ctx() {
+llama_context *Pipeline::get_ctx() const {
     return ctx;
 }
 
-llama_context *Pipeline::get_ctx_guidance() {
+llama_context *Pipeline::get_ctx_guidance() const {
     return ctx_guidance;
 }
 
-llama_sampling_context *Pipeline::get_ctx_sampling() {
+llama_sampling_context *Pipeline::get_ctx_sampling() const {
     return ctx_sampling;
 }
 
-std::vector<llama_token> &Pipeline::get_input_tokens() {
+std::vector<llama_token> &Pipeline::get_input_tokens(){
     return input_tokens;
 }
 
-std::vector<llama_token> &Pipeline::get_output_tokens() {
+std::vector<llama_token> &Pipeline::get_output_tokens(){
     return output_tokens;
 }
 
 std::ostringstream &Pipeline::get_output_ss() {
     return output_ss;
+}
+
+void Pipeline::write_logfile() {
+    ::write_logfile(ctx, params, model, input_tokens, output_ss.str(), output_tokens);
 }
 
 llama_context           ** g_ctx;

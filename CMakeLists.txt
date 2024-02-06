@@ -1004,7 +1004,8 @@ if (BOT_ENABLE_PYBIND)
   #set_target_properties(llama PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
   add_subdirectory(third_party/pybind11)
   pybind11_add_module(_C mission/mission_pybind.cpp)
-  target_link_libraries(_C PRIVATE mission)
+#  target_link_libraries(_C PRIVATE mission)
+  target_link_libraries(_C PRIVATE pipeline)
 endif ()
 
 # lint

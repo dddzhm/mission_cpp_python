@@ -54,14 +54,16 @@ public:
     ~Pipeline();
 
     std::string generator(const bool& init_flag= false, const std::string& prompts="");
+
     void tokenize(std::basic_string<char> prompts);
+    void write_logfile();
 
     bool get_is_interacting() const;
-    gpt_params get_params();
-    llama_model * get_model();
-    llama_context * get_ctx();
-    llama_context * get_ctx_guidance();
-    llama_sampling_context * get_ctx_sampling();
+    gpt_params get_params() const;
+    llama_model * get_model() const;
+    llama_context * get_ctx() const;
+    llama_context * get_ctx_guidance() const;
+    llama_sampling_context * get_ctx_sampling() const;
     std::vector<llama_token>& get_input_tokens();
     std::vector<llama_token>& get_output_tokens();
     std::ostringstream & get_output_ss();
