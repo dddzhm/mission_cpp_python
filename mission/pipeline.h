@@ -56,19 +56,17 @@ public:
     std::string generator(const bool& init_flag= false, const std::string& prompts="");
     void tokenize(std::basic_string<char> prompts);
 
-    bool is_interacting = false;
-
-    std::ostringstream output_ss;
-    std::vector<llama_token> input_tokens;
-    std::vector<llama_token> output_tokens;
-
-    llama_model* model = nullptr;
-    llama_context* ctx = nullptr;
-    llama_context* ctx_guidance = nullptr;
-    llama_sampling_context * ctx_sampling = nullptr;
-    std::unique_ptr<mission::MissionTokenizer> tokenizer = nullptr;
-
+    bool get_is_interacting() const;
     gpt_params get_params();
+    llama_model * get_model();
+    llama_context * get_ctx();
+    llama_context * get_ctx_guidance();
+    llama_sampling_context * get_ctx_sampling();
+    std::vector<llama_token>& get_input_tokens();
+    std::vector<llama_token>& get_output_tokens();
+    std::ostringstream & get_output_ss();
+
+    std::unique_ptr<mission::MissionTokenizer> tokenizer = nullptr;
 
 private:
     void reset_ctx_sampling();
@@ -95,8 +93,10 @@ private:
     bool input_echo           = true;
     bool display              = true;
     bool need_to_save_session = false;
+    bool is_interacting       = false;
 
     std::string        path_session;
+    std::ostringstream output_ss;
 
     std::vector<llama_token> session_tokens;
     std::vector<llama_token> inp_pfx;
@@ -108,6 +108,13 @@ private:
     std::vector<llama_token> embd;
     std::vector<llama_token> embd_guidance;
     std::vector<llama_token> embd_list;
+    std::vector<llama_token> input_tokens;
+    std::vector<llama_token> output_tokens;
+
+    llama_model* model = nullptr;
+    llama_context* ctx = nullptr;
+    llama_context* ctx_guidance = nullptr;
+    llama_sampling_context * ctx_sampling = nullptr;
 };
 
 #endif //PIPELINE_H

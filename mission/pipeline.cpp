@@ -764,6 +764,38 @@ void Pipeline::reset_ctx_sampling() {
     }
 }
 
+bool Pipeline::get_is_interacting() const {
+    return is_interacting;
+}
+
+llama_model * Pipeline::get_model() {
+    return model;
+}
+
+llama_context *Pipeline::get_ctx() {
+    return ctx;
+}
+
+llama_context *Pipeline::get_ctx_guidance() {
+    return ctx_guidance;
+}
+
+llama_sampling_context *Pipeline::get_ctx_sampling() {
+    return ctx_sampling;
+}
+
+std::vector<llama_token> &Pipeline::get_input_tokens() {
+    return input_tokens;
+}
+
+std::vector<llama_token> &Pipeline::get_output_tokens() {
+    return output_tokens;
+}
+
+std::ostringstream &Pipeline::get_output_ss() {
+    return output_ss;
+}
+
 llama_context           ** g_ctx;
 llama_model             ** g_model;
 gpt_params               * g_params;
@@ -852,15 +884,17 @@ int main(int argc, char ** argv){
 
     Pipeline test(params);
     std::cout<<test.generator(false, "instruction：识别目标和指令（指令包括:search、get、go_to、go_back、rotate、turn_left、turn_right、get_in、go_forward、wait、put、stop）。\\n任务:逆时针旋转负二十度。");
-    is_interacting = test.is_interacting;
+    is_interacting = test.get_is_interacting();
+    auto *t1_model = test.get_model();
+    auto *t2_ctx = test.get_ctx();
 
     gpt_params w_params = test.get_params();
-    g_ctx               = &test.ctx;
-    g_model             = &test.model;
+    g_ctx               = &t2_ctx;
+    g_model             = &t1_model;
     g_params            = &w_params;
-    g_input_tokens      = &test.input_tokens;
-    g_output_ss         = &test.output_ss;
-    g_output_tokens     = &test.output_tokens;
+    g_input_tokens      = &test.get_input_tokens();
+    g_output_ss         = &test.get_output_ss();
+    g_output_tokens     = &test.get_output_tokens();
 
 #if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__))
     struct sigaction sigint_action{};
