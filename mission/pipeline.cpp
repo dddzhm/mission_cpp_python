@@ -855,12 +855,12 @@ int main(int argc, char ** argv){
     is_interacting = test.is_interacting;
 
     gpt_params w_params = test.get_params();
-    g_ctx = &test.ctx;
-    g_model = &test.model;
-    g_params = &w_params;
-    g_input_tokens = &test.input_tokens;
-    g_output_ss = &test.output_ss;
-    g_output_tokens = &test.output_tokens;
+    g_ctx               = &test.ctx;
+    g_model             = &test.model;
+    g_params            = &w_params;
+    g_input_tokens      = &test.input_tokens;
+    g_output_ss         = &test.output_ss;
+    g_output_tokens     = &test.output_tokens;
 
 #if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__))
     struct sigaction sigint_action{};
