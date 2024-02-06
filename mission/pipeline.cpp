@@ -333,7 +333,7 @@ Pipeline::Pipeline(const gpt_params &p): params(p), sparams(p.sparams), path_ses
     n_remain             = params.n_predict;
     ctx_sampling         = llama_sampling_init(sparams);
 
-    std::cout << generator("") << "\n";
+    std::cout << generator(true) << "\n";
 }
 
 Pipeline::~Pipeline() {
@@ -359,12 +359,17 @@ gpt_params Pipeline::get_params() {
     return params;
 }
 
-std::string Pipeline::generator(const std::string& prompts) {
+std::string Pipeline::generator(const bool& init_flag, const std::string& prompts) {
+    if (prompts.empty() && !init_flag){
+        return "未获得输入......";
+    }
     // TODO: add "console" settings and delete all "printf"
     if (!prompts.empty()){
         tokenize(prompts);
     }
-    // TODO: add "console" settings and delete all "printf" and delete some part
+    // TODO: [add "console" settings] and [delete all "printf"] and [delete some part] and [add break]
+    int init_count = 2;
+    std::string result;
     while ((n_remain != 0 && !is_antiprompt) || params.interactive) {
         // predict
         if (!embd.empty()) {
@@ -377,9 +382,9 @@ std::string Pipeline::generator(const std::string& prompts) {
                 const int skipped_tokens = (int) embd.size() - max_embd_size;
                 embd.resize(max_embd_size);
 
-                console::set_display(console::error);
+//                console::set_display(console::error);
                 printf("<<input too long: skipped %d token%s>>", skipped_tokens, skipped_tokens != 1 ? "s" : "");
-                console::set_display(console::reset);
+//                console::set_display(console::reset);
                 fflush(stdout);
             }
 
@@ -465,8 +470,8 @@ std::string Pipeline::generator(const std::string& prompts) {
             // evaluate tokens in batches
             // embd is typically prepared beforehand to fit within a batch, but not always
             if (ctx_guidance) {
-                int input_size = 0;
-                llama_token * input_buf = nullptr;
+                int input_size;
+                llama_token * input_buf;
 
                 if (n_past_guidance < (int) guidance_inp.size()) {
                     // Guidance context should have the same data with these modifications:
@@ -578,12 +583,13 @@ std::string Pipeline::generator(const std::string& prompts) {
             // display text
             if (input_echo && display) {
                 auto t1 = tokenizer->decode(embd);
+                result += t1;
                 printf("%s", t1.c_str());
                 fflush(stdout);
             }
             // reset color to default if there is no pending user input
             if (input_echo && (int) embd_inp.size() == n_consumed) {
-                console::set_display(console::reset);
+//                console::set_display(console::reset);
                 display = true;
             }
         }
@@ -627,12 +633,13 @@ std::string Pipeline::generator(const std::string& prompts) {
                     // display text
                     if (input_echo && display) {
                         auto logit_string = tokenizer->decode(embd_list);
+                        result = logit_string;
                         printf("%s", logit_string.c_str());
                         fflush(stdout);
                     }
                     // reset color to default if there is no pending user input
                     if (input_echo && (int) embd_inp.size() == n_consumed) {
-                        console::set_display(console::reset);
+//                        console::set_display(console::reset);
                         display = true;
                     }
                 }
@@ -656,14 +663,14 @@ std::string Pipeline::generator(const std::string& prompts) {
                 } else if (params.instruct || params.chatml) {
                     is_interacting = true;
                 }
+                break;
             }
 
-            if (n_past > 0) {
-                if (is_interacting) {
-                    llama_sampling_reset(ctx_sampling);
-                }
-                is_interacting = false;
+            if (init_flag && --init_count <= 0) {
+                break;
             }
+
+            reset_ctx_sampling();
         }
 
         // end of text token
@@ -679,7 +686,7 @@ std::string Pipeline::generator(const std::string& prompts) {
             is_interacting = true;
         }
     }
-    return "";
+    return result;
 }
 
 void Pipeline::tokenize(std::basic_string<char> prompts) {
@@ -760,9 +767,14 @@ void Pipeline::tokenize(std::basic_string<char> prompts) {
 
         input_echo = false; // do not echo this again
     }
-    //TODO: 集成函数
+    reset_ctx_sampling();
+}
+
+void Pipeline::reset_ctx_sampling() {
     if (n_past > 0) {
+        LOG_TEE("%s\n", "--------------------------------------------");
         if (is_interacting) {
+            LOG_TEE("%s\n", "+++++++++++++++++++++++++++++++++++++++++++++");
             llama_sampling_reset(ctx_sampling);
         }
         is_interacting = false;
@@ -848,6 +860,7 @@ int main(int argc, char ** argv){
     params.prompt = "You are a helpful assistant.";
     params.chatml = true;
     params.interactive=true;
+    params.no_streaming= true;
     //
 
     if (!gpt_params_parse(argc, argv, params)){
@@ -855,7 +868,7 @@ int main(int argc, char ** argv){
     }
 
     Pipeline test(params);
-    test.generator("test");
+    test.generator(false, "instruction：识别目标和指令（指令包括:search、get、go_to、go_back、rotate、turn_left、turn_right、get_in、go_forward、wait、put、stop）。\\n任务:逆时针旋转负二十度。");
     is_interacting = test.is_interacting;
 
 #if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__))

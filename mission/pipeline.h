@@ -2,8 +2,8 @@
 // Created by zhouhongmin on 24-2-5.
 //
 
-#ifndef PIPLINE_H
-#define PIPLINE_H
+#ifndef PIPELINE_H
+#define PIPELINE_H
 
 #include "common.h"
 
@@ -53,7 +53,7 @@ public:
     explicit Pipeline(const gpt_params &params);
     ~Pipeline();
 
-    std::string generator(const std::string& prompts);
+    std::string generator(const bool& init_flag= false, const std::string& prompts="");
     void tokenize(std::basic_string<char> prompts);
 
     bool is_interacting = false;
@@ -71,6 +71,7 @@ public:
     gpt_params get_params();
 
 private:
+    void reset_ctx_sampling();
     static void llama_log_callback_logTee(ggml_log_level level, const char * text, void * user_data);
 
     gpt_params params;
@@ -109,4 +110,4 @@ private:
     std::vector<llama_token> embd_list;
 };
 
-#endif //PIPLINE_H
+#endif //PIPELINE_H
