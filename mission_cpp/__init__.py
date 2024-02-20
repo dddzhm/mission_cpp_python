@@ -17,8 +17,8 @@ class Pipeline(_C.Pipeline):
                  n_parallel: int = 1, n_gpu_layers: int = -1, main_gpu: int = 0, model: str = './model/model.gguf',
                  tiktoken_config: str = './model/tiktoken_config.json', tiktoken_path: str = './model/qwen.tiktoken',
                  prompt: str = 'You are a helpful assistant.', chatml: bool = True, interactive: bool = True,
-                 no_streaming: bool = False, n_prev: int = 64, top_k: int = 40, top_p: int = 0.95, temp: int = 0.8,
-                 penalty_repeat: int = 1.1):
+                 no_streaming: bool = False, recoder_history: bool = False, n_prev: int = 64, top_k: int = 40,
+                 top_p: int = 0.95, temp: int = 0.8, penalty_repeat: int = 1.1):
         """
         :param n_threads: number of threads
         :param n_ctx: context size
@@ -35,6 +35,7 @@ class Pipeline(_C.Pipeline):
         :param chatml: chatml mode (used for models trained on chatml syntax)
         :param interactive: interactive mode
         :param no_streaming: chat without streaming results
+        :param recoder_history: recoder historical information
         :param n_prev: number of previous tokens to remember
         :param top_k: <= 0 to use vocab size
         :param top_p: 1.0 = disabled
@@ -64,6 +65,7 @@ class Pipeline(_C.Pipeline):
         params.chatml = chatml
         params.interactive = interactive
         params.no_streaming = no_streaming
+        params.recoder_history = recoder_history
         params.sparams = sparams
 
         super().__init__(params)

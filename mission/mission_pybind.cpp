@@ -65,6 +65,7 @@ PYBIND11_MODULE(_C, m) {
     .def_readwrite("chatml", &gpt_params::chatml)
     .def_readwrite("interactive", &gpt_params::interactive)
     .def_readwrite("no_streaming", &gpt_params::no_streaming)
+    .def_readwrite("recoder_history", &gpt_params::recoder_history)
     .def_readwrite("sparams", &gpt_params::sparams);
 
   py::class_<llama_sampling_params>(m, "llama_sampling_params")
