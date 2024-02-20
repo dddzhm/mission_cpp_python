@@ -524,6 +524,8 @@ bool gpt_params_parse_ex(int argc, char ** argv, gpt_params & params) {
             params.tiktoken_path = argv[i];
         } else if (arg == "-nsg" || arg == "--no_streaming"){
             params.no_streaming = true;
+        } else if (arg == "-rh" || arg == "--recoder_history"){
+            params.recoder_history = true;
         } else if (arg == "--lora") {
             if (++i >= argc) {
                 invalid_param = true;
