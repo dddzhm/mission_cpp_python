@@ -494,6 +494,10 @@ extern "C" {
                        llama_pos   p0,
                        llama_pos   p1);
 
+    LLAMA_API void llama_kv_cache_reset_head(
+            struct llama_context * ctx,
+            int start_pos);
+
     // Removes all tokens that do not belong to the specified sequence
     LLAMA_API void llama_kv_cache_seq_keep(
             struct llama_context * ctx,

@@ -1985,6 +1985,21 @@ static void llama_kv_cache_seq_cp(
     }
 }
 
+static void llama_kv_cache_reset_head(
+        struct llama_kv_cache & cache,
+        int start_pos) {
+    cache.head = start_pos;
+    cache.used = start_pos;
+    for (uint32_t i = start_pos; i < cache.cells.size(); i++) {
+        if (cache.cells[i].pos >= 0) {
+            cache.cells[i].pos = -1;
+            cache.cells[i].seq_id.clear();
+        } else {
+            break;
+        }
+    }
+}
+
 static void llama_kv_cache_seq_keep(struct llama_kv_cache & cache, llama_seq_id seq_id) {
     uint32_t new_head = cache.size;
 
@@ -10643,6 +10658,12 @@ void llama_kv_cache_seq_cp(struct llama_context * ctx, llama_seq_id seq_id_src, 
         return;
     }
     llama_kv_cache_seq_cp(ctx->kv_self, seq_id_src, seq_id_dst, p0, p1);
+}
+
+void llama_kv_cache_reset_head(
+        struct llama_context * ctx,
+        int start_pos) {
+    llama_kv_cache_reset_head(ctx->kv_self, start_pos);
 }
 
 void llama_kv_cache_seq_keep(struct llama_context * ctx, llama_seq_id seq_id) {
