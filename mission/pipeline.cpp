@@ -333,7 +333,9 @@ Pipeline::Pipeline(const gpt_params &p): params(p), sparams(p.sparams), path_ses
     n_remain             = params.n_predict;
     ctx_sampling         = llama_sampling_init(sparams);
 
+    kv_used = (int)embd_inp.size();
     generator(true);
+    init_embd_inp = embd_inp;
 }
 
 Pipeline::~Pipeline() {
@@ -638,7 +640,7 @@ std::string Pipeline::generator(const bool& init_flag, const std::string& prompt
                 }
 
                 if (params.interactive) {
-                    if (!params.antiprompt.empty()) {
+                    if (!params.antiprompt.empty() && params.recoder_history) {
                         // tokenize and inject first reverse prompt
                         std::vector<llama_token> first_antiprompt;
                         if (tokenizer != nullptr) {
@@ -678,11 +680,17 @@ std::string Pipeline::generator(const bool& init_flag, const std::string& prompt
             is_interacting = true;
         }
     }
+    embd_list.clear();
+    llama_kv_cache_reset_head(ctx, kv_used);
     return result;
 }
 
 void Pipeline::tokenize(std::basic_string<char> prompts) {
     if (n_past > 0 && is_interacting) {
+        if (!params.recoder_history){
+            embd_inp = init_embd_inp;
+        }
+
         if (params.input_prefix_bos) {
             LOG("adding input prefix BOS token\n");
             embd_inp.push_back(llama_token_bos(model));
@@ -1824,6 +1832,10 @@ int main(int argc, char ** argv){
     params.chatml = true;
     params.interactive=true;
     params.no_streaming= true;
+    params.sparams.top_k=0;
+    params.sparams.top_p=0.5;
+    params.sparams.temp=0.95;
+    params.sparams.penalty_repeat=1.0;
     //
 
     if (!gpt_params_parse(argc, argv, params)){
@@ -1831,6 +1843,7 @@ int main(int argc, char ** argv){
     }
 
     Pipeline test(params);
+    std::cout<<test.generator(false, "instruction：识别目标和指令（指令包括:search、get、go_to、go_back、rotate、turn_left、turn_right、get_in、go_forward、wait、put、stop）。\\n任务:向左移动六十米。");
     std::cout<<test.generator(false, "instruction：识别目标和指令（指令包括:search、get、go_to、go_back、rotate、turn_left、turn_right、get_in、go_forward、wait、put、stop）。\\n任务:逆时针旋转负二十度。");
     is_interacting = test.get_is_interacting();
     auto *t1_model = test.get_model();
@@ -1856,13 +1869,13 @@ int main(int argc, char ** argv){
         };
         SetConsoleCtrlHandler(reinterpret_cast<PHANDLER_ROUTINE>(console_ctrl_handler), true);
 #endif
-    std::string line;
-    while(true){
-        if(!std::getline(std::cin, line)) {
-            line.clear();
-            break;
-        }
-        std::cout<<line<<"\n";
-    }
+//    std::string line;
+//    while(true){
+//        if(!std::getline(std::cin, line)) {
+//            line.clear();
+//            break;
+//        }
+//        std::cout<<line<<"\n";
+//    }
     return 0;
 }

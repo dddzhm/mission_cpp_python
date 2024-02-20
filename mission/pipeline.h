@@ -90,6 +90,7 @@ private:
     int n_consumed          = 0;
     int n_session_consumed  = 0;
     int n_past_guidance     = 0;
+    int kv_used             = 0;
     int ga_i                = 0;
     int ga_n;
     int ga_w;
@@ -110,6 +111,7 @@ private:
     std::vector<llama_token> cml_pfx;
     std::vector<llama_token> cml_sfx;
     std::vector<llama_token> embd_inp;
+    std::vector<llama_token> init_embd_inp;
     std::vector<llama_token> guidance_inp;
     std::vector<llama_token> embd;
     std::vector<llama_token> embd_guidance;

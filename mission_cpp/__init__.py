@@ -18,7 +18,7 @@ class Pipeline(_C.Pipeline):
                  tiktoken_config: str = './model/tiktoken_config.json', tiktoken_path: str = './model/qwen.tiktoken',
                  prompt: str = 'You are a helpful assistant.', chatml: bool = True, interactive: bool = True,
                  no_streaming: bool = False, recoder_history: bool = False, n_prev: int = 64, top_k: int = 40,
-                 top_p: int = 0.95, temp: int = 0.8, penalty_repeat: int = 1.1):
+                 top_p: float = 0.95, temp: float = 0.8, penalty_repeat: float = 1.1, **kwargs):
         """
         :param n_threads: number of threads
         :param n_ctx: context size
@@ -70,6 +70,5 @@ class Pipeline(_C.Pipeline):
 
         super().__init__(params)
 
-    def gen(self, prompt:str = '') -> str:
+    def gen(self, prompt: str = '') -> str:
         return self.generator(False, prompt)
-
